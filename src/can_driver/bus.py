@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from types import TracebackType
 from typing import Optional
 
 from .frame import CANFrame
@@ -48,12 +49,25 @@ class CANBus(ABC):
         """Enter a context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         """Close the CAN connection when leaving a context manager."""
         self.close()
 
 
 class CANError(Exception):
     """Base exception for CAN communication failures."""
+    pass
+
+
+class CANErrorFrame(CANError):
+    """A controller error frame was reported by the bus.
+
+    The frame that was lost is not available. The bus is still usable.
+    """
     pass
 

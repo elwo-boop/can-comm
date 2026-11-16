@@ -12,10 +12,10 @@ from contextlib import ExitStack
 from websockets.asyncio.server import serve
 from can_driver.backends.local import LocalCANBus
 from can_driver.bus import CANBus
-
-from gateway import CANGateway
+from can_driver.server.gateway import CANGateway
 
 CHANNELS = ("can0", "can1")
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 LOG = logging.getLogger("can_gateway")
 
 async def main():
@@ -44,6 +44,15 @@ async def main():
     if args.enable_tx and not tx_token:
         parser.error(
             "CAN_TX_TOKEN must be set to enable remote transmission."
+        )
+
+    if len(set(args.channels)) != len(args.channels):
+        parser.error("--channels must not contain duplicates.")
+
+    if args.host not in LOOPBACK_HOSTS:
+        LOG.warning(
+            "Gateway is listening on %s. Read access is not authenticated.",
+            args.host,
         )
 
     with ExitStack() as stack:

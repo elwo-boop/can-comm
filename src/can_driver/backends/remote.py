@@ -3,9 +3,9 @@ Remote CAN communication backend using WebSockets.
 """
 
 import json
+import logging
 import time
 from collections import deque
-from typing import Optional
 
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import ClientConnection, connect
@@ -14,6 +14,7 @@ from ..bus import CANBus, CANError
 from ..frame import CANFrame
 
 BUFFER_SIZE = 1024
+LOG = logging.getLogger("can_driver.remote")
 
 class RemoteCANBus(CANBus):
     """CAN bus implementation using a remote WebSocket gateway.
@@ -27,6 +28,7 @@ class RemoteCANBus(CANBus):
         host: str,
         port: int = 8738,
         path: str = "/can",
+        tx_token: str | None = None,
         secure: bool = False,
         connect_timeout: float = 5.0,
     ) -> None:
@@ -37,16 +39,24 @@ class RemoteCANBus(CANBus):
             host: IP address or hostname of the CAN gateway.
             port: WebSocket server port.
             path: WebSocket endpoint path.
+            tx_token: Token required by the gateway to transmit frames.
             secure: Use TLS (wss://) when True.
             connect_timeout: Connection timeout in seconds.
 
         Raises:
             CANError: If the connection cannot be established.
         """
+        self.tx_token = tx_token
         scheme = "wss" if secure else "ws"
         self._url = f"{scheme}://{host}:{port}/{path.lstrip('/')}"
-        self._ws: Optional[ClientConnection] = None
+        self._ws: ClientConnection | None = None
         self._pending: dict[str, deque[CANFrame]] = {}
+
+        if tx_token is not None and not secure:
+            LOG.warning(
+                "TX token will be sent unencrypted over %s. Use secure=True.",
+                self._url,
+            )
 
         try:
             self._ws = connect(
@@ -58,7 +68,7 @@ class RemoteCANBus(CANBus):
                 proxy=None,
             )
 
-        except (OSError, TimeoutError, ValueError, Exception) as exc:
+        except Exception as exc:
             raise CANError(
                 f"Failed to connect to CAN gateway at {self._url}: {exc}."
             ) from exc
@@ -77,6 +87,7 @@ class RemoteCANBus(CANBus):
         packet = {
             "type": "tx",
             "channel": channel,
+            "token": self.tx_token,
             "frame": {
                 "arbitration_id": frame.arbitration_id,
                 "data": frame.data.hex(),
@@ -90,6 +101,7 @@ class RemoteCANBus(CANBus):
             ws.send(json.dumps(packet))
 
         except (ConnectionClosed, OSError) as exc:
+            self._ws = None
             raise CANError(
                 f"Remote CAN transmission failed: {exc}"
             ) from exc
@@ -134,7 +146,7 @@ class RemoteCANBus(CANBus):
                 f"Invalid message from CAN gateway: {exc}."
             ) from exc
 
-    def receive(self, channel: str, timeout: Optional[float] = None) -> Optional[CANFrame]:
+    def receive(self, channel: str, timeout: float | None = None) -> CANFrame | None:
         """
         Receive the next CAN frame on a channel from the remote gateway.
 
@@ -175,6 +187,7 @@ class RemoteCANBus(CANBus):
                 return None
 
             except (ConnectionClosed, OSError) as exc:
+                self._ws = None
                 raise CANError(
                     f"Remote CAN reception failed: {exc}."
                 ) from exc
@@ -191,12 +204,15 @@ class RemoteCANBus(CANBus):
 
     def close(self) -> None:
         """Close the WebSocket connection."""
-        if self._ws is None:
+        ws = self._ws
+
+        if ws is None:
             return
 
+        self._ws = None
+
         try:
-            self._ws.close()
-            self._ws = None
+            ws.close()
 
         except OSError as exc:
             raise CANError(

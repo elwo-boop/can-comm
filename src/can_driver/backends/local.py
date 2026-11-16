@@ -2,12 +2,13 @@
 Local CAN communication backend using python-can.
 """
 
-from typing import Optional
+from typing import Any
 
 import can
 
-from ..bus import CANBus, CANError
-from ..frame import CANFrame
+from can_driver.bus import CANBus, CANError, CANErrorFrame
+from can_driver.frame import CANFrame
+
 
 class LocalCANBus(CANBus):
     """CAN bus implementation for local hardware adapters."""
@@ -16,8 +17,8 @@ class LocalCANBus(CANBus):
         self,
         interface: str,
         channel: str,
-        bitrate: Optional[int] = None, # trev5 = 500000 kbps
-        **kwargs,
+        bitrate: int | None = 500000,  # trev5 = 500000 bps
+        **kwargs: Any,
     ) -> None:
         """
         Initialize a local CAN interface.
@@ -31,11 +32,11 @@ class LocalCANBus(CANBus):
         Raises:
             CANError: If the interface cannot be initialized.
         """
-        self._bus: Optional[can.BusABC] = None
-        self._channel = channel
+        self._bus: can.BusABC | None = None
+        self._channel: str = channel
 
         try:
-            config = {
+            config: dict[str, Any] = {
                 "interface": interface,
                 "channel": channel,
                 **kwargs,
@@ -90,26 +91,30 @@ class LocalCANBus(CANBus):
         except can.CanError as exc:
             raise CANError(f"CAN transmission failed: {exc}.") from exc
 
-    def receive(self, channel: str, timeout: Optional[float] = None) -> Optional[CANFrame]:
+    def receive(self, channel: str, timeout: float | None = None) -> CANFrame | None:
         """
         Receive a CAN frame.
 
         Args:
             channel: Channel to receive from. Must match the channel this bus was opened on.
-            timeout: Maximum time to wait in seconds.
+            timeout: Maximum time to wait in seconds. None blocks indefinitely.
 
-        Returns None if the specified timeout expires.
+        Returns:
+            Received CANFrame, or None if the timeout expires.
 
         Raises:
-            CANError: If the channel does not match or reception fails.
+            CANErrorFrame: If the bus reported a controller error frame. Frames
+                were lost, but the bus remains usable.
+            CANError: If the channel does not match, reception fails, or a
+                CAN FD frame is received.
         """
         self._check_channel(channel)
 
         if self._bus is None:
-            raise CANError("CAN bus is closed")
+            raise CANError("CAN bus is closed.")
 
         try:
-            message = self._bus.recv(timeout=timeout)
+            message: can.Message | None = self._bus.recv(timeout=timeout)
 
         except can.CanError as exc:
             raise CANError(f"CAN reception failed: {exc}.") from exc
@@ -118,13 +123,13 @@ class LocalCANBus(CANBus):
             return None
 
         if message.is_error_frame:
-            raise CANError(
+            raise CANErrorFrame(
                 f"Received CAN controller error frame: {message}."
             )
 
         if message.is_fd:
             raise CANError(
-                "CAN FD frame receieved. Only Classical CAN is supported."
+                "CAN FD frame received. Only Classical CAN is supported."
             )
 
         return CANFrame(
@@ -141,7 +146,7 @@ class LocalCANBus(CANBus):
         if self._bus is None:
             return
 
-        bus = self._bus
+        bus: can.BusABC = self._bus
         self._bus = None
 
         try:
@@ -149,4 +154,3 @@ class LocalCANBus(CANBus):
 
         except can.CanError as exc:
             raise CANError(f"CAN shutdown failed: {exc}.") from exc
-
