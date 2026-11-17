@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Optional
 
-from .frame import CANFrame
+from can_driver.frame import CANFrame
 
 class CANBus(ABC):
     """Hardware-independent interface for CAN communication."""
@@ -22,7 +21,7 @@ class CANBus(ABC):
         pass
 
     @abstractmethod
-    def receive(self, channel: str, timeout: Optional[float] = None) -> Optional[CANFrame]:
+    def receive(self, channel: str, timeout: float | None = None) -> CANFrame | None:
         """
         Receive the next CAN frame on a channel.
 

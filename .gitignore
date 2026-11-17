@@ -1,5 +1,9 @@
 # https://github.com/github/gitignore/blob/main/Python.gitignore
 
+# test directory
+src/test/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

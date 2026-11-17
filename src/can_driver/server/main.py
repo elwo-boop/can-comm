@@ -23,7 +23,7 @@ async def main():
         description="Raspberry Pi CAN WebSocket Gateway"
     )
 
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8738)
     parser.add_argument("--enable-tx", action="store_true")
     parser.add_argument(

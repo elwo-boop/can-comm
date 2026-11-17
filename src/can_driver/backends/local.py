@@ -9,7 +9,6 @@ import can
 from can_driver.bus import CANBus, CANError, CANErrorFrame
 from can_driver.frame import CANFrame
 
-
 class LocalCANBus(CANBus):
     """CAN bus implementation for local hardware adapters."""
 

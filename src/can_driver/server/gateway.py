@@ -45,7 +45,7 @@ class CANGateway:
             channel: asyncio.Lock() for channel in buses
         }
 
-    def start_receivers(self, loop):
+    def start_recgivers(self, loop):
         """Start one CAN receiver thread per physical bus."""
 
         for channel in self.buses:
@@ -71,7 +71,7 @@ class CANGateway:
             count = self.error_frames.get(channel, 0) + 1
             self.error_frames[channel] = count
 
-            if count == 1 or count % 100 == 0:
+            if count == 1 or count % 10 == 0:
                 LOG.warning(
                     "CAN error frame on %s (%d total). Frames were lost. Error: %s.",
                     channel,
@@ -141,7 +141,7 @@ class CANGateway:
                     client.queue.get_nowait()
                     client.dropped += 1
 
-                    if client.dropped == 1 or client.dropped % 100 == 0:
+                    if client.dropped == 1 or client.dropped % 10 == 0:
                         LOG.warning(
                             "Slow client: %d queued CAN frames dropped.",
                             client.dropped,

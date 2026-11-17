@@ -1,7 +1,6 @@
-from dataclasses import dataclass, field
-from typing import Optional
-
 """Abstract representation of a Classical CAN frame."""
+
+from dataclasses import dataclass, field
 
 @dataclass(slots=True)
 class CANFrame:
@@ -11,8 +10,8 @@ class CANFrame:
     data: bytes = field(default_factory=bytes)
     is_extended_id: bool = False
     is_remote_frame: bool = False
-    timestamp: Optional[float] = None
-    dlc: Optional[int] = None
+    timestamp: float | None = None
+    dlc: int | None = None
 
     def __post_init__(self) -> None:
         """Validate and normalize the CAN frame."""
